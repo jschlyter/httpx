@@ -184,11 +184,12 @@ class DigestAuth(Auth):
         "SHA-512-SESS": hashlib.sha512,
     }
 
-    def __init__(self, username: str | bytes, password: str | bytes) -> None:
+    def __init__(self, username: str | bytes, password: str | bytes, header: str | None = None) -> None:
         self._username = to_bytes(username)
         self._password = to_bytes(password)
         self._last_challenge: _DigestAuthChallenge | None = None
         self._nonce_count = 1
+        self._header = header or "www-authenticate"
 
     def auth_flow(self, request: Request) -> typing.Generator[Request, Response, None]:
         if self._last_challenge:
@@ -198,12 +199,12 @@ class DigestAuth(Auth):
 
         response = yield request
 
-        if response.status_code != 401 or "www-authenticate" not in response.headers:
+        if response.status_code != 401 or self._header not in response.headers:
             # If the response is not a 401 then we don't
             # need to build an authenticated request.
             return
 
-        for auth_header in response.headers.get_list("www-authenticate"):
+        for auth_header in response.headers.get_list(self._header):
             if auth_header.lower().startswith("digest "):
                 break
         else:
